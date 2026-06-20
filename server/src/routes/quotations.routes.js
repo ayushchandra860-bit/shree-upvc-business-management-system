@@ -21,7 +21,7 @@ const quotationSchema = z.object({
   discount: z.coerce.number().min(0).optional().default(0),
   gst_percent: z.coerce.number().min(0).max(28).optional().default(18),
   notes: z.string().trim().optional().default(''),
-  terms_conditions: z.string().trim().optional().default('Payment as agreed. Final measurements and site conditions are subject to verification before manufacturing.'),
+  terms_conditions: z.string().trim().optional().default('This quotation covers fabrication, TRANSPORTATION and installation as specifically listed. Final production quantities remain subject to approved site measurements before manufacturing. Delivery timelines begin after design approval and advance confirmation.'),
   items: z.array(z.object({
     product_id: z.string().uuid(),
     width_mm: z.coerce.number().positive(),

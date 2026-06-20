@@ -27,21 +27,54 @@ const settingsSchema = z.object({
   sidebar_color: z.string().trim().optional().default('#0b2d5c')
 });
 
+async function ensureSettingsRow() {
+  await query(
+    `INSERT INTO company_settings (id)
+     VALUES (true)
+     ON CONFLICT (id) DO NOTHING`
+  );
+}
+
 router.get('/', asyncHandler(async (req, res) => {
+  await ensureSettingsRow();
   const result = await query('SELECT * FROM company_settings WHERE id = true');
   res.json({ settings: result.rows[0] });
 }));
 
 router.put('/', asyncHandler(async (req, res) => {
   const payload = settingsSchema.parse(req.body);
+  await ensureSettingsRow();
   const result = await query(
-    `UPDATE company_settings
-     SET company_name = $1, logo_url = $2, gst_number = $3, address = $4,
-         mobile_number = $5, email = $6, bank_details = $7, qr_code_url = $8,
-         signature_url = $9, bank_name = $10, account_number = $11, ifsc = $12, upi_id = $13,
-         terms_conditions = $14, authorized_signature = $15, theme_mode = $16,
-         primary_color = $17, sidebar_color = $18, updated_at = now()
-     WHERE id = true
+    `INSERT INTO company_settings (
+       id, company_name, logo_url, gst_number, address, mobile_number, email, bank_details,
+       qr_code_url, signature_url, bank_name, account_number, ifsc, upi_id,
+       terms_conditions, authorized_signature, theme_mode, primary_color, sidebar_color
+     )
+     VALUES (
+       true, $1, $2, $3, $4, $5, $6, $7,
+       $8, $9, $10, $11, $12, $13,
+       $14, $15, $16, $17, $18
+     )
+     ON CONFLICT (id) DO UPDATE
+     SET company_name = EXCLUDED.company_name,
+         logo_url = EXCLUDED.logo_url,
+         gst_number = EXCLUDED.gst_number,
+         address = EXCLUDED.address,
+         mobile_number = EXCLUDED.mobile_number,
+         email = EXCLUDED.email,
+         bank_details = EXCLUDED.bank_details,
+         qr_code_url = EXCLUDED.qr_code_url,
+         signature_url = EXCLUDED.signature_url,
+         bank_name = EXCLUDED.bank_name,
+         account_number = EXCLUDED.account_number,
+         ifsc = EXCLUDED.ifsc,
+         upi_id = EXCLUDED.upi_id,
+         terms_conditions = EXCLUDED.terms_conditions,
+         authorized_signature = EXCLUDED.authorized_signature,
+         theme_mode = EXCLUDED.theme_mode,
+         primary_color = EXCLUDED.primary_color,
+         sidebar_color = EXCLUDED.sidebar_color,
+         updated_at = now()
      RETURNING *`,
     [
       payload.company_name,

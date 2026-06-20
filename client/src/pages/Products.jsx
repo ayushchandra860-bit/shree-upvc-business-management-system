@@ -15,6 +15,7 @@ export default function Products({ setNotice }) {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [categoryForm, setCategoryForm] = useState({ category_name: '', description: '', active: true });
+  const [editingCategoryId, setEditingCategoryId] = useState('');
   const [form, setForm] = useState(blankProduct);
   const [editingId, setEditingId] = useState('');
 
@@ -26,9 +27,13 @@ export default function Products({ setNotice }) {
 
   async function addCategory(event) {
     event.preventDefault();
-    await api('/api/products/categories', { method: 'POST', body: JSON.stringify(categoryForm) });
+    await api(editingCategoryId ? `/api/products/categories/${editingCategoryId}` : '/api/products/categories', {
+      method: editingCategoryId ? 'PUT' : 'POST',
+      body: JSON.stringify(categoryForm)
+    });
     setCategoryForm({ category_name: '', description: '', active: true });
-    setNotice('Product category added');
+    setEditingCategoryId('');
+    setNotice(editingCategoryId ? 'Product category updated' : 'Product category added');
     await loadProducts();
   }
 
@@ -66,7 +71,22 @@ export default function Products({ setNotice }) {
 
   async function deleteProduct(productId) {
     await api(`/api/products/${productId}`, { method: 'DELETE' });
-    setNotice('Product deactivated');
+    setNotice('Product deleted');
+    await loadProducts();
+  }
+
+  function editCategory(category) {
+    setEditingCategoryId(category.id);
+    setCategoryForm({
+      category_name: category.category_name,
+      description: category.description || '',
+      active: category.active
+    });
+  }
+
+  async function deleteCategory(categoryId) {
+    await api(`/api/products/categories/${categoryId}`, { method: 'DELETE' });
+    setNotice('Product category deactivated');
     await loadProducts();
   }
 
@@ -128,10 +148,17 @@ export default function Products({ setNotice }) {
             Description
             <input value={categoryForm.description} onChange={(event) => setCategoryForm({ ...categoryForm, description: event.target.value })} />
           </label>
-          <button className="secondaryButton" type="submit"><Plus size={18} />Add Category</button>
+          <button className="secondaryButton" type="submit"><Plus size={18} />{editingCategoryId ? 'Save Category' : 'Add Category'}</button>
+          {editingCategoryId && <button className="secondaryButton" type="button" onClick={() => { setEditingCategoryId(''); setCategoryForm({ category_name: '', description: '', active: true }); }}><X size={18} />Cancel</button>}
         </form>
         <div className="categoryPills">
-          {categories.map((category) => <span key={category.id}>{category.category_name}</span>)}
+          {categories.map((category) => (
+            <span key={category.id}>
+              {category.category_name}
+              <button type="button" onClick={() => editCategory(category)}>Edit</button>
+              <button type="button" onClick={() => deleteCategory(category.id)}>Delete</button>
+            </span>
+          ))}
         </div>
       </section>
 

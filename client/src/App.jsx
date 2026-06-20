@@ -57,6 +57,10 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [page]);
+
   const setPage = (nextPage) => {
     window.location.hash = `#/${nextPage}`;
     setPageState(nextPage);
@@ -86,7 +90,9 @@ export default function App() {
           <button type="button" onClick={() => setNotice('')}>Close</button>
         </div>
       )}
-      <ActivePage setNotice={setNotice} />
+      <div className="pageMotion" key={page}>
+        <ActivePage setNotice={setNotice} />
+      </div>
     </Layout>
   );
 }

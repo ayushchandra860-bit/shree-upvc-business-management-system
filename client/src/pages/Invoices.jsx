@@ -39,6 +39,42 @@ export default function Invoices({ setNotice }) {
       }))
   ), [source, orders, quotations]);
 
+  const invoiceSummary = useMemo(() => (
+    invoices.reduce((summary, invoice) => ({
+      count: summary.count + 1,
+      finalAmount: summary.finalAmount + Number(invoice.final_amount || 0),
+      paidAmount: summary.paidAmount + Number(invoice.paid_amount || 0),
+      outstanding: summary.outstanding + Number(invoice.remaining_amount || 0)
+    }), {
+      count: 0,
+      finalAmount: 0,
+      paidAmount: 0,
+      outstanding: 0
+    })
+  ), [invoices]);
+
+  const editingSummary = useMemo(() => {
+    if (!editingInvoice) return null;
+
+    const subtotal = Number(
+      invoices.find((invoice) => invoice.id === editingInvoice.id)?.subtotal || 0
+    );
+    const transportation = Number(editingInvoice.transportation_charges || 0);
+    const installation = Number(editingInvoice.installation_charges || 0);
+    const manufacturing = Number(editingInvoice.manufacturing_charges || 0);
+    const discount = Number(editingInvoice.discount || 0);
+    const gstPercent = Number(editingInvoice.gst_percent || 0);
+    const taxable = Math.max(subtotal + transportation + installation + manufacturing - discount, 0);
+    const gstAmount = taxable * gstPercent / 100;
+
+    return {
+      subtotal,
+      taxable,
+      gstAmount,
+      finalAmount: taxable + gstAmount
+    };
+  }, [editingInvoice, invoices]);
+
   async function submit(event) {
     event.preventDefault();
     await api('/api/invoices', {
@@ -97,18 +133,40 @@ export default function Invoices({ setNotice }) {
     <div className="pageStack">
       <section className="panel">
         <div className="sectionHeader">
-          <h2>Generate Invoice</h2>
+          <div>
+            <p className="sectionKicker">Billing</p>
+            <h2>Invoices</h2>
+            <p className="panelLead">Create, edit, print and share invoices with a cleaner billing flow.</p>
+          </div>
+        </div>
+        <div className="miniStatsRow">
+          <article className="miniStat">
+            <span>Total Invoices</span>
+            <strong>{invoiceSummary.count}</strong>
+          </article>
+          <article className="miniStat">
+            <span>Total Billed</span>
+            <strong>{formatMoney(invoiceSummary.finalAmount)}</strong>
+          </article>
+          <article className="miniStat">
+            <span>Received</span>
+            <strong>{formatMoney(invoiceSummary.paidAmount)}</strong>
+          </article>
+          <article className="miniStat emphasis">
+            <span>Outstanding</span>
+            <strong>{formatMoney(invoiceSummary.outstanding)}</strong>
+          </article>
         </div>
         <form className="formGrid invoiceForm" onSubmit={submit}>
           <label>
-            Source
+            Invoice Source
             <select value={source} onChange={(event) => { setSource(event.target.value); setSourceId(''); }}>
               <option value="order">Order</option>
               <option value="quotation">Quotation</option>
             </select>
           </label>
           <label className="spanTwo">
-            {source === 'order' ? 'Order' : 'Quotation'}
+            {source === 'order' ? 'Order Reference' : 'Quotation Reference'}
             <select value={sourceId} onChange={(event) => setSourceId(event.target.value)} required>
               <option value="">Select {source}</option>
               {options.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
@@ -116,7 +174,7 @@ export default function Invoices({ setNotice }) {
           </label>
           <button className="primaryButton" type="submit">
             <ReceiptText size={18} />
-            Generate Invoice
+            Create Invoice
           </button>
         </form>
       </section>
@@ -124,18 +182,31 @@ export default function Invoices({ setNotice }) {
       {editingInvoice && (
         <section className="panel">
           <div className="sectionHeader">
-            <h2>Edit Invoice</h2>
+            <div>
+              <p className="sectionKicker">Document Editor</p>
+              <h2>Edit Invoice</h2>
+            </div>
             <button className="iconButton" title="Cancel edit" type="button" onClick={() => setEditingInvoice(null)}><X size={18} /></button>
           </div>
-          <form className="formGrid fourCols" onSubmit={saveInvoice}>
-            <label>Invoice Date<input type="date" value={editingInvoice.invoice_date} onChange={(event) => setEditingInvoice({ ...editingInvoice, invoice_date: event.target.value })} /></label>
-            <label>Transportation<input type="number" min="0" value={editingInvoice.transportation_charges} onChange={(event) => setEditingInvoice({ ...editingInvoice, transportation_charges: event.target.value })} /></label>
-            <label>Installation<input type="number" min="0" value={editingInvoice.installation_charges} onChange={(event) => setEditingInvoice({ ...editingInvoice, installation_charges: event.target.value })} /></label>
-            <label>Manufacturing<input type="number" min="0" value={editingInvoice.manufacturing_charges} onChange={(event) => setEditingInvoice({ ...editingInvoice, manufacturing_charges: event.target.value })} /></label>
-            <label>Discount<input type="number" min="0" value={editingInvoice.discount} onChange={(event) => setEditingInvoice({ ...editingInvoice, discount: event.target.value })} /></label>
-            <label>GST %<input type="number" min="0" max="28" value={editingInvoice.gst_percent} onChange={(event) => setEditingInvoice({ ...editingInvoice, gst_percent: event.target.value })} /></label>
-            <label className="spanTwo">Notes<input value={editingInvoice.notes} onChange={(event) => setEditingInvoice({ ...editingInvoice, notes: event.target.value })} /></label>
-            <label className="spanTwo">Terms & Conditions<textarea value={editingInvoice.terms_conditions} onChange={(event) => setEditingInvoice({ ...editingInvoice, terms_conditions: event.target.value })} /></label>
+          <form className="formSection invoiceEditor" onSubmit={saveInvoice}>
+            <div className="formGrid fourCols">
+              <label>Invoice Date<input type="date" value={editingInvoice.invoice_date} onChange={(event) => setEditingInvoice({ ...editingInvoice, invoice_date: event.target.value })} /></label>
+              <label>TRANSPORTATION<input type="number" min="0" value={editingInvoice.transportation_charges} onChange={(event) => setEditingInvoice({ ...editingInvoice, transportation_charges: event.target.value })} /></label>
+              <label>Installation<input type="number" min="0" value={editingInvoice.installation_charges} onChange={(event) => setEditingInvoice({ ...editingInvoice, installation_charges: event.target.value })} /></label>
+              <label>Manufacturing<input type="number" min="0" value={editingInvoice.manufacturing_charges} onChange={(event) => setEditingInvoice({ ...editingInvoice, manufacturing_charges: event.target.value })} /></label>
+              <label>Discount<input type="number" min="0" value={editingInvoice.discount} onChange={(event) => setEditingInvoice({ ...editingInvoice, discount: event.target.value })} /></label>
+              <label>GST %<input type="number" min="0" max="28" value={editingInvoice.gst_percent} onChange={(event) => setEditingInvoice({ ...editingInvoice, gst_percent: event.target.value })} /></label>
+            </div>
+            <div className="inlineSummaryBar">
+              <span className="inlineSummaryPill">Subtotal <strong>{formatMoney(editingSummary?.subtotal)}</strong></span>
+              <span className="inlineSummaryPill">Taxable <strong>{formatMoney(editingSummary?.taxable)}</strong></span>
+              <span className="inlineSummaryPill">GST <strong>{formatMoney(editingSummary?.gstAmount)}</strong></span>
+              <span className="inlineSummaryPill emphasis">Final Amount <strong>{formatMoney(editingSummary?.finalAmount)}</strong></span>
+            </div>
+            <div className="formGrid noteGrid">
+              <label>Notes<textarea value={editingInvoice.notes} onChange={(event) => setEditingInvoice({ ...editingInvoice, notes: event.target.value })} placeholder="Delivery note, payment note or customer-specific billing note." /></label>
+              <label>Terms & Conditions<textarea value={editingInvoice.terms_conditions} onChange={(event) => setEditingInvoice({ ...editingInvoice, terms_conditions: event.target.value })} /></label>
+            </div>
             <button className="primaryButton" type="submit"><Save size={18} />Save Invoice</button>
           </form>
         </section>
@@ -143,27 +214,31 @@ export default function Invoices({ setNotice }) {
 
       <section className="panel">
         <div className="sectionHeader">
-          <h2>Invoices</h2>
+          <div>
+            <p className="sectionKicker">Register</p>
+            <h2>Invoice Register</h2>
+          </div>
         </div>
         {invoices.length ? (
           <div className="tableWrap">
             <table>
               <thead>
                 <tr>
-                  <th>Invoice No.</th>
-                  <th>Date</th>
+                  <th>Document</th>
                   <th>Customer</th>
                   <th>Source</th>
                   <th className="amountCell">Final Amount</th>
-                  <th>Payment</th>
-                  <th>Buttons</th>
+                  <th>Payment Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {invoices.map((invoice) => (
                   <tr key={invoice.id}>
-                    <td>{invoice.invoice_number}</td>
-                    <td>{formatDate(invoice.invoice_date)}</td>
+                    <td>
+                      <strong>{invoice.invoice_number}</strong>
+                      <span className="subText">{formatDate(invoice.invoice_date)}</span>
+                    </td>
                     <td>
                       <strong>{invoice.customer_name}</strong>
                       <span className="subText">{invoice.mobile_number}</span>
@@ -186,7 +261,7 @@ export default function Invoices({ setNotice }) {
                         <a
                           className="iconButton small"
                           title="Share on WhatsApp"
-                          href={whatsappUrl(`Invoice ${invoice.invoice_number} from SHREE UPVC WINDOWS & DOORS. Amount: ${formatMoney(invoice.final_amount)}. Due: ${formatMoney(invoice.remaining_amount)}`)}
+                          href={whatsappUrl(`Invoice ${invoice.invoice_number} from SHREE UPVC WINDOWS & DOORS. Invoice value: ${formatMoney(invoice.final_amount)}. Outstanding amount: ${formatMoney(invoice.remaining_amount)}.`)}
                           target="_blank"
                           rel="noreferrer"
                         >

@@ -129,15 +129,16 @@ router.patch('/:id/active', asyncHandler(async (req, res) => {
 
 router.delete('/:id', asyncHandler(async (req, res) => {
   const result = await query(
-    `UPDATE products SET active = false WHERE id = $1
+    `DELETE FROM products
+     WHERE id = $1
      RETURNING id, product_name`,
     [req.params.id]
   );
   if (!result.rowCount) {
     throw httpError(404, 'Product not found');
   }
-  await logAudit(req, 'delete', 'product', req.params.id, { softDelete: true });
-  res.json({ message: 'Product deactivated' });
+  await logAudit(req, 'delete', 'product', req.params.id, { hardDelete: true });
+  res.json({ message: 'Product deleted' });
 }));
 
 module.exports = router;
