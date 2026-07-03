@@ -667,11 +667,8 @@ function generateQuotationPdf(quotation, items, outputStream, settings = company
   const summaryWidth = panelWidth;
 
   const notesTermsY = drawTextPanel(doc, PAGE_MARGIN, currentY, panelWidth, 'Commercial Notes', [
-    // Use drawTextPanel for notes and terms
-    sections: [
-      ['Notes', quotation.notes || '-'],
-      ['Terms & Conditions', quotation.terms_conditions || resolvedSettings.terms_conditions || '-']
-    ]
+    ['Notes', quotation.notes || '-'],
+    ['Terms & Conditions', quotation.terms_conditions || resolvedSettings.terms_conditions || '-']
   });
 
   drawSummaryBox(doc, {
