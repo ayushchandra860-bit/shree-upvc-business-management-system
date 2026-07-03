@@ -48,9 +48,15 @@ async function nextNumber(client, sequenceType) {
   return `${sequence.rows[0].prefix}-${new Date().getFullYear()}-${String(nextValue).padStart(5, '0')}`;
 }
 
+async function getCompanySettings() {
+  const result = await query('SELECT * FROM company_settings WHERE id = true');
+  return result.rows[0] || {};
+}
+
 module.exports = {
   pool,
   query,
   withTransaction,
-  nextNumber
+  nextNumber,
+  getCompanySettings
 };

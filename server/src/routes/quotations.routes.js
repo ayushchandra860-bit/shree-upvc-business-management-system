@@ -2,9 +2,9 @@ const express = require('express');
 const { z } = require('zod');
 const asyncHandler = require('../utils/asyncHandler');
 const httpError = require('../utils/httpError');
-const { query, withTransaction, nextNumber } = require('../config/db');
+const { query, withTransaction, nextNumber, getCompanySettings } = require('../config/db');
 const { calculateQuotation } = require('../utils/calculations');
-const { generateQuotationPdf } = require('../utils/pdf');
+const { generateQuotationPdf, normalizeSettings } = require('../utils/pdf'); // Import normalizeSettings
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -342,10 +342,9 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 
 router.get('/:id/pdf', asyncHandler(async (req, res) => {
   const { quotation, items } = await getQuotationById(req.params.id);
-  const settings = await query('SELECT * FROM company_settings WHERE id = true');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `${req.query.download === 'true' ? 'attachment' : 'inline'}; filename="${quotation.quotation_number}.pdf"`);
-  generateQuotationPdf(quotation, items, res, settings.rows[0]);
+  generateQuotationPdf(quotation, items, res, await getCompanySettings());
 }));
 
 router.post('/:id/confirm', asyncHandler(async (req, res) => {

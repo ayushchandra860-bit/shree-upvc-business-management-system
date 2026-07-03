@@ -2,7 +2,7 @@ const express = require('express');
 const { z } = require('zod');
 const asyncHandler = require('../utils/asyncHandler');
 const httpError = require('../utils/httpError');
-const { query, withTransaction, nextNumber } = require('../config/db');
+const { query, withTransaction, nextNumber, getCompanySettings } = require('../config/db');
 const { generateInvoicePdf } = require('../utils/pdf');
 
 const router = express.Router();
@@ -264,15 +264,15 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 
 router.get('/:id/pdf', asyncHandler(async (req, res) => {
   const { invoice, items } = await getInvoiceById(req.params.id);
-  const settings = await query('SELECT * FROM company_settings WHERE id = true');
+  const settings = await getCompanySettings();
 
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader(
     'Content-Disposition',
     `${req.query.download === 'true' ? 'attachment' : 'inline'}; filename="${invoice.invoice_number}.pdf"`
   );
-
-  generateInvoicePdf(invoice, items, res, settings.rows[0]);
+  // settings is already the object returned by getCompanySettings()
+  generateInvoicePdf(invoice, items, res, settings);
 }));
 
 router.refreshInvoicePayment = refreshInvoicePayment;

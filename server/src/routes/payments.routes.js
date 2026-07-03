@@ -3,8 +3,8 @@ const PDFDocument = require('pdfkit');
 const { z } = require('zod');
 const asyncHandler = require('../utils/asyncHandler');
 const httpError = require('../utils/httpError');
-const { query, withTransaction, nextNumber } = require('../config/db');
-const { currency } = require('../utils/pdf');
+const { query, withTransaction, nextNumber, getCompanySettings } = require('../config/db');
+const { currency, formatDocumentDate, normalizeSettings, drawCompanyHeader, drawCustomerSection, drawFinancialSummaryCard, drawTextSection, drawDocumentFooter } = require('../utils/pdf');
 const { logAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -130,7 +130,7 @@ router.delete('/:id', asyncHandler(async (req, res) => {
 router.get('/:id/receipt', asyncHandler(async (req, res) => {
   const result = await query(
     `SELECT p.*, c.customer_name, c.mobile_number, i.invoice_number
-     FROM payments p
+     , c.site_address, c.gst_number FROM payments p
      LEFT JOIN customers c ON c.id = p.customer_id
      LEFT JOIN invoices i ON i.id = p.invoice_id
      WHERE p.id = $1`,
@@ -138,34 +138,50 @@ router.get('/:id/receipt', asyncHandler(async (req, res) => {
   );
   if (!result.rowCount) throw httpError(404, 'Payment not found');
   const payment = result.rows[0];
-
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `inline; filename="${payment.receipt_number}.pdf"`);
+  res.setHeader('Content-Disposition', `inline; filename="Payment_Receipt_${payment.receipt_number}.pdf"`);
 
-  const doc = new PDFDocument({ margin: 42, size: 'A4' });
+  const doc = new PDFDocument({ margin: 42, size: 'A4' }); // Use PAGE_MARGIN from pdf.js if exposed
   doc.pipe(res);
-  doc.fillColor('#0b2d5c').font('Helvetica-Bold').fontSize(18).text('SHREE UPVC WINDOWS & DOORS');
-  doc.fillColor('#4b5563').font('Helvetica').fontSize(10)
-    .text('Baba Market, Lekha Nagar, Danapur, Patna - 801105, Bihar')
-    .moveDown(2);
-  doc.fillColor('#0b2d5c').font('Helvetica-Bold').fontSize(20).text('PAYMENT RECEIPT', { align: 'center' });
-  doc.moveDown();
-  [
-    ['Receipt Number', payment.receipt_number],
-    ['Date', payment.payment_date],
-    ['Customer', payment.customer_name],
-    ['Mobile', payment.mobile_number],
-    ['Invoice', payment.invoice_number || '-'],
+  const companySettings = await getCompanySettings();
+  const resolvedSettings = normalizeSettings(companySettings);
+
+  let currentY = drawCompanyHeader(doc, resolvedSettings, 'PAYMENT RECEIPT');
+
+  // Customer Section for Payment Receipt
+  currentY = drawCustomerSection(doc, {
+    customer_name: payment.customer_name,
+    mobile_number: payment.mobile_number,
+    site_address: payment.site_address || '-',
+    gst_number: payment.gst_number || '-'
+  }, currentY, 'Received From', [
+    ['Receipt No', payment.receipt_number],
+    ['Date', formatDocumentDate(payment.payment_date)],
+    ['Invoice No', payment.invoice_number || '-']
+  ]);
+
+  currentY += 12;
+
+  // Payment Details Summary
+  const summaryX = 42; // Use PAGE_MARGIN
+  const summaryWidth = 595 - 2 * 42; // Use PAGE_MARGIN
+  const paymentSummaryRows = [
     ['Payment Mode', payment.payment_mode],
-    ['Reference', payment.reference_number || '-'],
-    ['Amount Received', currency(payment.amount)]
-  ].forEach(([label, value]) => {
-    doc.font('Helvetica-Bold').fillColor('#374151').text(`${label}: `, { continued: true });
-    doc.font('Helvetica').fillColor('#111827').text(String(value || '-'));
-  });
-  doc.moveDown(3);
-  doc.text('Authorized Signature', 42, 680);
-  doc.text('Customer Signature', 390, 680);
+    ['Reference No', payment.reference_number || '-'],
+    ['Notes', payment.notes || '-']
+  ];
+  currentY += drawFinancialSummaryCard(doc, summaryX, currentY, summaryWidth, 'Payment Details', paymentSummaryRows, payment.amount);
+
+  currentY += 12;
+
+  // Notes (if any)
+  if (payment.notes) {
+    currentY = drawTextSection(doc, 'Notes', payment.notes, currentY);
+  }
+
+  // Footer
+  drawDocumentFooter(doc, resolvedSettings, currentY, 'Received By', 'Customer Signature', `This is a computer-generated payment receipt issued by ${resolvedSettings.company_name}.`);
+
   doc.end();
 }));
 
